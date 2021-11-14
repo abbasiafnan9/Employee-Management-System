@@ -1,32 +1,29 @@
 const inquirer = require('inquirer');
 const mysql = require('mysql2');
-const cTable = require('console.table');
+ require('console.table');
 const { start } = require('repl');
+require('dotenv').config();
+const util= require('util');
+
 
 //comnnect to database
 const db = mysql.createConnection(
     {
       host: 'localhost',
       // MySQL username,
-      user: 'root',
+      user: process.env.DB_NAME,
       // MySQL password
-      password: 'password',
-      database: 'company_db'
+      password: process.env.DB_PASSWORD,
+      database: "company_db"
     },
     console.log(`Connected to the company_db database.`)
 );
+db.connect(function(err){
+    if (err) throw err
+})
 
-// console.table([
-//     {
-//         name: 'foo',
-//         age: 10
-//     },
-//     {
-//         name: 'bar',
-//         age: 20
-//     }
-// ]);
 
+db.query=util.promisify(db.query)
 
 
 function startMenu() {
@@ -70,22 +67,28 @@ function startMenu() {
 startMenu();
 
 //displays the department table
-function viewDepartments() {
+async function viewDepartments() {
     // Query database
-    db.query('SELECT * FROM department', function (err, results) {
-    console.log(results);
-  });
+  const results = await db.query('SELECT * FROM department')
+  console.table(results);
   startMenu();
 };
 
+function getRoles(){
+  return db.query('SELECT * FROM role') 
+}
+
 //dispays the role table
-function viewRoles() {
-    // Query database
-    db.query('SELECT * FROM role', function (err, results) {
-    console.log(results);
-  });
+async function viewRoles() {
+    const results = await getRoles();
+    console.table(results);
+   
+  
   startMenu();
 };
+
+  
+
 
 //displays the employee table
 function viewEmployees() {
@@ -140,7 +143,9 @@ function addRole() {
 };
 
 //adds a new employee to the employee table
-function addEmployee() {
+async function addEmployee() {
+    const roles = await getRoles();
+    const roleChoices = await roles.map(role =>({name:role.name, value:role.id}));
     inquirer.prompt([
         {
             type: 'input',
@@ -156,13 +161,13 @@ function addEmployee() {
             type: 'list',
             message: 'What is the employee\'s role.',
             name: 'role',
-            choices: []//choose from existing roles
+            choices: roleChoices
         }, 
         {
             type: 'list',
             message: 'Who is the employee\'s manager.',
             name: 'manager',
-            choices: []// choose from existing managers
+            choices: []
         }, 
     ]).then(({first_name, last_name, role, manager}) => {
         db.query('INSERT INTO employee (first_name, last_name, role, manager) VALUES (?)', first_name, last_name, role, manager,  (err, results) => {
